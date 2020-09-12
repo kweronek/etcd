@@ -1,0 +1,58 @@
+export ETCDCTL_API=3
+CLUSTER_NODES=3
+CLUSTER_TAG=etcd-$1
+CLUSTER_STATE=new
+CPUS=2
+MEM=2G
+DISK=4G
+export TOKEN=token-01
+declare -A IP_ADDRESS
+unset ENDPOINTS
+#
+clear
+for ((CNT=1; CNT<=$CLUSTER_NODES; CNT+=1)); do
+echo "*****************************************************************************************************************"
+	multipass launch lts --name $CLUSTER_TAG-$CNT --cpus $CPUS --mem $MEM --disk $DISK
+	IP_ADDRESS[$CNT]="$(multipass info ${CLUSTER_TAG}-${CNT}	 | grep "IPv4" | awk -F' ' '{print $2}')"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo apt-get update -y -qq"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo apt-get upgrade --assume-yes -qq"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "export ETCDCTL_API=3 && sudo apt-get install -y etcd -qq"
+	export ENDPOINTS=${ENDPOINTS}${IP_ADDRESS[$CNT]}":2379,"
+done
+#
+export CLUSTER=$CLUSTER_TAG-1=http://${IP_ADDRESS[1]}:2380,$CLUSTER_TAG-2=http://${IP_ADDRESS[2]}:2380,$CLUSTER_TAG-3=http://${IP_ADDRESS[3]}:2380
+export ENDPOINTS=${ENDPOINTS%?}
+echo "*****************************************************************************************************************"
+echo "initial Cluster: $CLUSTER"
+echo "ENDPOINTS:       $ENDPOINTS"
+#
+for ((CNT=1; CNT<=$CLUSTER_NODES; CNT+=1)); do
+	echo "*****************************************************************************************************************"
+	echo "Host: ${CLUSTER_TAG}-${CNT}"
+	echo "IP  : ${IP_ADDRESS[$CNT]}"
+
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo mkdir ~/data.etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo chgrp etcd ~/data.etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo chmod 770 ~/data.etcd"
+
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo chmod 777 /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_NAME=${CLUSTER_TAG}-${CNT}' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_DATA_DIR=/home/ubuntu/data.etcd' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_INITIAL_CLUSTER_STATE=${CLUSTER_STATE}' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_INITIAL_CLUSTER_TOKEN=${TOKEN}' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_INITIAL_CLUSTER=${CLUSTER}' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_INITIAL_ADVERTISE_PEER_URLS=http://${IP_ADDRESS[$CNT]}:2380' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_ADVERTISE_CLIENT_URLS=http://${IP_ADDRESS[$CNT]}:2379' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "echo 'ETCD_LISTEN_CLIENT_URLS=http://${IP_ADDRESS[$CNT]}:2379' >> /etc/default/etcd"
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo chmod 544 /etc/default/etcd"
+	sleep 1
+	multipass exec $CLUSTER_TAG-$CNT -- /bin/bash -c "sudo systemctl restart etcd"
+done
+#
+echo "*****************************************************************************************************************"
+echo Type:
+echo "export ETCDCTL_API=3"
+echo "export ENDPOINTS=${ENDPOINTS}"
+echo "etcdctl --endpoints="\$"ENDPOINTS member list --write-out="\""table"\"" "
+echo "*****************************************************************************************************************"
