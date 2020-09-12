@@ -1,3 +1,4 @@
+#!/bin/bash
 export ETCDCTL_API=3
 CLUSTER_NODES=3
 CLUSTER_TAG=etcd-$1
@@ -6,7 +7,7 @@ CPUS=2
 MEM=2G
 DISK=4G
 export TOKEN=token-01
-declare -A IP_ADDRESS
+declare -a IP_ADDRESS
 unset ENDPOINTS
 #
 clear
@@ -55,4 +56,9 @@ echo Type:
 echo "export ETCDCTL_API=3"
 echo "export ENDPOINTS=${ENDPOINTS}"
 echo "etcdctl --endpoints="\$"ENDPOINTS member list --write-out="\""table"\"" "
+echo "export ETCDCTL_API=3" > setetcd
+echo "export ENDPOINTS=${ENDPOINTS}" >> setetcd
+echo "etcdctl --endpoints="\$"ENDPOINTS member list --write-out="\""table"\"" " >> setetcd
+echo "or run ./setetcd"
+chmod 777 setetcd
 echo "*****************************************************************************************************************"
