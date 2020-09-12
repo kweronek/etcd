@@ -59,6 +59,7 @@ echo "etcdctl --endpoints="\$"ENDPOINTS member list --write-out="\""table"\"" "
 echo "export ETCDCTL_API=3" > setetcd
 echo "export ENDPOINTS=${ENDPOINTS}" >> setetcd
 echo "etcdctl --endpoints="\$"ENDPOINTS member list --write-out="\""table"\"" " >> setetcd
-echo "or run ./setetcd"
+echo "or type:"
+echo "source ./setetcd"
 chmod 777 setetcd
 echo "*****************************************************************************************************************"
